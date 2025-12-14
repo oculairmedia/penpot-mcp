@@ -42,7 +42,12 @@ function connectToMcpServer(): void {
     }
 
     try {
-        ws = new WebSocket("ws://localhost:4402");
+        // Use dynamic WebSocket URL based on current page host (for reverse proxy/tunnel support)
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const host = window.location.host;
+        const wsUrl = `${protocol}//${host}/ws`;
+
+        ws = new WebSocket(wsUrl);
         updateConnectionStatus("Connecting...", false);
 
         ws.onopen = () => {

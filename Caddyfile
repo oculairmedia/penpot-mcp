@@ -1,0 +1,69 @@
+# Caddyfile for Penpot MCP Server
+# For Cloudflare Tunnel (HTTP from tunnel)
+
+(cors_headers) {
+    header Access-Control-Allow-Origin "*"
+    header Access-Control-Allow-Methods "GET, POST, OPTIONS"
+    header Access-Control-Allow-Headers "Content-Type, Authorization, Accept"
+}
+
+(strip_upstream_cors) {
+    header_down -Access-Control-Allow-Origin
+    header_down -Access-Control-Allow-Methods
+    header_down -Access-Control-Allow-Headers
+}
+
+:80 {
+    # Handle preflight OPTIONS requests
+    @options method OPTIONS
+    handle @options {
+        import cors_headers
+        respond "" 204
+    }
+
+    # WebSocket route (for plugin communication)
+    @ws path /ws
+    handle @ws {
+        reverse_proxy penpot-mcp:4402 {
+            transport http {
+                keepalive 30s
+                keepalive_idle_conns 10
+            }
+            flush_interval -1
+        }
+    }
+
+    # MCP Server routes - with extended timeouts for long operations
+    @mcp path /mcp*
+    handle @mcp {
+        reverse_proxy penpot-mcp:4401 {
+            import strip_upstream_cors
+            transport http {
+                read_timeout 120s
+                write_timeout 120s
+            }
+            flush_interval -1
+        }
+    }
+
+    @sse path /sse*
+    handle @sse {
+        reverse_proxy penpot-mcp:4401 {
+            import strip_upstream_cors
+            flush_interval -1
+            transport http {
+                read_timeout 300s
+            }
+        }
+    }
+
+    # Everything else to plugin server
+    handle {
+        reverse_proxy penpot-mcp:4400 {
+            import strip_upstream_cors
+        }
+    }
+
+    # Set CORS headers on all responses
+    import cors_headers
+}

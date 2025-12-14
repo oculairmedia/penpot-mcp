@@ -25,6 +25,8 @@ export default defineConfig({
     },
     preview: {
         port: 4400,
+        host: '0.0.0.0',
         cors: true,
+        allowedHosts: ['penpot-mcp.oculair.ca', 'penpotmcp.oculair.ca', 'localhost', '192.168.50.80'],
     },
 });

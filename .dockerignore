@@ -1,0 +1,11 @@
+node_modules
+.git
+.gitignore
+README.md
+*.md
+.prettierrc
+.prettierignore
+.serena
+dist
+.DS_Store
+npm-debug.log
