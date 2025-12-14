@@ -3,14 +3,21 @@
 
 (cors_headers) {
     header Access-Control-Allow-Origin "*"
-    header Access-Control-Allow-Methods "GET, POST, OPTIONS"
-    header Access-Control-Allow-Headers "Content-Type, Authorization, Accept"
+    header Access-Control-Allow-Methods "GET, POST, OPTIONS, DELETE"
+    header Access-Control-Allow-Headers "Content-Type, Authorization, Accept, mcp-session-id, mcp-protocol-version"
+}
+
+(iframe_headers) {
+    # Allow embedding in Penpot iframe
+    header -X-Frame-Options
+    header Content-Security-Policy "frame-ancestors 'self' https://prototype.oculair.ca https://*.oculair.ca http://localhost:* http://192.168.50.*:*"
 }
 
 (strip_upstream_cors) {
     header_down -Access-Control-Allow-Origin
     header_down -Access-Control-Allow-Methods
     header_down -Access-Control-Allow-Headers
+    header_down -X-Frame-Options
 }
 
 :80 {
@@ -64,6 +71,7 @@
         }
     }
 
-    # Set CORS headers on all responses
+    # Set CORS and iframe headers on all responses
     import cors_headers
+    import iframe_headers
 }
