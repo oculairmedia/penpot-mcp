@@ -33,9 +33,17 @@ export class PluginBridge {
             this.connectedClients.add(ws);
 
             ws.on("message", (data: Buffer) => {
-                this.logger.info("Received WebSocket message: %s", data.toString());
                 try {
-                    const response: PluginTaskResponse<any> = JSON.parse(data.toString());
+                    const message = JSON.parse(data.toString());
+
+                    // Handle ping messages to keep connection alive
+                    if (message.type === "ping") {
+                        ws.send(JSON.stringify({ type: "pong" }));
+                        return;
+                    }
+
+                    this.logger.info("Received WebSocket message: %s", data.toString());
+                    const response: PluginTaskResponse<any> = message;
                     this.handlePluginTaskResponse(response);
                 } catch (error) {
                     this.logger.error(error, "Failed to parse WebSocket message");

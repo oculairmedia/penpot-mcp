@@ -6,6 +6,10 @@ document.body.dataset.theme = searchParams.get("theme") ?? "light";
 
 // WebSocket connection management
 let ws: WebSocket | null = null;
+let pingInterval: ReturnType<typeof setInterval> | null = null;
+let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
+const PING_INTERVAL_MS = 30000; // Send ping every 30 seconds
+const RECONNECT_DELAY_MS = 5000; // Wait 5 seconds before reconnecting
 const statusElement = document.getElementById("connection-status");
 
 /**
@@ -16,6 +20,42 @@ function updateConnectionStatus(status: string, isConnectedState: boolean): void
         statusElement.textContent = status;
         statusElement.style.color = isConnectedState ? "var(--accent-primary)" : "var(--error-700)";
     }
+}
+
+/**
+ * Starts the ping interval to keep the connection alive.
+ */
+function startPingInterval(): void {
+    stopPingInterval();
+    pingInterval = setInterval(() => {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: "ping" }));
+            console.log("Sent ping to keep connection alive");
+        }
+    }, PING_INTERVAL_MS);
+}
+
+/**
+ * Stops the ping interval.
+ */
+function stopPingInterval(): void {
+    if (pingInterval) {
+        clearInterval(pingInterval);
+        pingInterval = null;
+    }
+}
+
+/**
+ * Schedules a reconnection attempt.
+ */
+function scheduleReconnect(): void {
+    if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout);
+    }
+    reconnectTimeout = setTimeout(() => {
+        console.log("Attempting to reconnect...");
+        connectToMcpServer();
+    }, RECONNECT_DELAY_MS);
 }
 
 /**
@@ -53,14 +93,19 @@ function connectToMcpServer(): void {
         ws.onopen = () => {
             console.log("Connected to MCP server");
             updateConnectionStatus("Connected to MCP server", true);
+            startPingInterval();
         };
 
         ws.onmessage = (event) => {
             console.log("Received from MCP server:", event.data);
             try {
-                const request = JSON.parse(event.data);
+                const message = JSON.parse(event.data);
+                // Ignore pong responses
+                if (message.type === "pong") {
+                    return;
+                }
                 // Forward the task request to the plugin for execution
-                parent.postMessage(request, "*");
+                parent.postMessage(message, "*");
             } catch (error) {
                 console.error("Failed to parse WebSocket message:", error);
             }
@@ -68,8 +113,10 @@ function connectToMcpServer(): void {
 
         ws.onclose = () => {
             console.log("Disconnected from MCP server");
-            updateConnectionStatus("Disconnected", false);
+            updateConnectionStatus("Disconnected - reconnecting...", false);
+            stopPingInterval();
             ws = null;
+            scheduleReconnect();
         };
 
         ws.onerror = (error) => {
